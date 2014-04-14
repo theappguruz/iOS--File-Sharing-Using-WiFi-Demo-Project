@@ -1,0 +1,53 @@
+- (IBAction) scanButtonTapped
+{
+    ZBarReaderViewController *reader = [ZBarReaderViewController new];
+    reader.readerDelegate = self;
+    reader.supportedOrientationsMask = ZBarOrientationMaskAll;
+
+    ZBarImageScanner *scanner = reader.scanner;
+
+    [scanner setSymbology:0 config:ZBAR_CFG_ENABLE to:0];
+    [scanner setSymbology:ZBAR_QRCODE config:ZBAR_CFG_ENABLE to:1];
+
+    [self presentModalViewController: reader animated: YES];
+}
+
+- (void) imagePickerController: (UIImagePickerController*) reader didFinishPickingMediaWithInfo: (NSDictionary*) info
+{
+    [reader dismissModalViewControllerAnimated: NO];
+    id<NSFastEnumeration> results = [info objectForKey: ZBarReaderControllerResults];
+    ZBarSymbol *symbol = nil; for(symbol in results) break;
+    sTmp = symbol.data;
+    
+    if ([[sTmp substringToIndex:4] isEqualToString:@"www."]) {
+        sTmp = [NSString stringWithFormat:@"http://%@", sTmp];
+    }
+    
+    if ([[sTmp substringToIndex:7] isEqualToString:@"http://"] || [[sTmp substringToIndex:8] isEqualToString:@"https://"]) {
+
+        AppTabs *a = [[AppTabs alloc] init];
+        a.tabText = symbol.data;
+        a.settings = [[AppTabsSettings alloc]init];
+        a.settings.url = sTmp;
+        TBWeb *w = [[TBWeb alloc] initWithNibName:@"TBWeb" bundle:nil]; w.aTab = a; w.scalePage = YES;
+        [self.navigationController pushViewController:w animated:YES];  w = nil;
+    }else if ([[sTmp substringToIndex:5] isEqualToString:@"BEGIN"]) {
+        [HUD show:YES];
+        [self performSelector:@selector(setCaledarEventData:) withObject:sTmp afterDelay:.1];
+    }else {
+        SBJsonParser *json = [[SBJsonParser alloc] init];
+        sTmp = [json objectWithString:symbol.data];
+        if ([[sTmp valueForKey:@"type"] isEqualToString:@"2"]) {
+            AppTabs *a = [[AppTabs alloc] init];
+            a.tabText = [sTmp valueForKey:@"url"];
+            a.settings.url = [sTmp valueForKey:@"url"];
+            TBWeb *w = [[TBWeb alloc] initWithNibName:@"TBWeb" bundle:nil]; w.aTab = a; w.scalePage = YES;
+            [self.navigationController pushViewController:w animated:YES];  w = nil;
+        } else if ([[sTmp valueForKey:@"type"] isEqualToString:@"3"]) {
+            MPMoviePlayerViewController *moviePlay = [[MPMoviePlayerViewController alloc] initWithContentURL:[NSURL URLWithString:[sTmp valueForKey:@"url"]]];
+            [self presentMoviePlayerViewControllerAnimated:moviePlay];
+            moviePlay.moviePlayer.movieSourceType = MPMovieSourceTypeFile;
+            [moviePlay.moviePlayer play];  moviePlay = nil;
+        }
+    }
+}
